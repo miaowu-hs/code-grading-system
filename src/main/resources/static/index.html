@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编程作业智能批改系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .submission-card { margin-bottom: 20px; }
+        .result-panel { display: none; }
+        .loading { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">编程作业智能批改系统</h1>
+        
+        <!-- 作业提交表单 -->
+        <div class="card submission-card">
+            <div class="card-header">
+                <h5>提交作业</h5>
+            </div>
+            <div class="card-body">
+                <form id="submissionForm">
+                    <div class="mb-3">
+                        <label for="language" class="form-label">编程语言</label>
+                        <select class="form-select" id="language" required>
+                            <option value="java">Java</option>
+                            <option value="python">Python</option>
+                            <option value="cpp">C++</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="sourceCode" class="form-label">源代码</label>
+                        <textarea class="form-control" id="sourceCode" rows="15" placeholder="请输入您的代码..." required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="testCases" class="form-label">测试用例 (JSON格式)</label>
+                        <textarea class="form-control" id="testCases" rows="5" placeholder='[{"input": "1 2", "expectedOutput": "3"}]'></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">提交批改</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 加载状态 -->
+        <div id="loading" class="loading alert alert-info">
+            正在批改作业，请稍候...
+        </div>
+        
+        <!-- 结果显示面板 -->
+        <div id="resultPanel" class="result-panel card">
+            <div class="card-header">
+                <h5>批改结果</h5>
+            </div>
+            <div class="card-body">
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('submissionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // 显示加载状态
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultPanel').style.display = 'none';
+            
+            const formData = {
+                language: document.getElementById('language').value,
+                sourceCode: document.getElementById('sourceCode').value,
+                testCases: JSON.parse(document.getElementById('testCases').value || '[]')
+            };
+            
+            try {
+                const response = await fetch('/api/submissions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                // 隐藏加载状态
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok) {
+                    displayResult(result);
+                } else {
+                    showError('批改失败: ' + result.message);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('网络错误: ' + error.message);
+            }
+        });
+        
+        function displayResult(result) {
+            let html = `
+                <h6>执行结果:</h6>
+                <p><strong>编译状态:</strong> ${result.executionResult.compileSuccess ? '成功' : '失败'}</p>
+                <p><strong>运行状态:</strong> ${result.executionResult.runtimeSuccess ? '成功' : '失败'}</p>
+                <p><strong>执行时间:</strong> ${result.executionResult.executionTime}ms</p>
+                <p><strong>输出:</strong> <pre>${result.executionResult.output || ''}</pre></p>
+            `;
+            
+            if (result.aiFeedback) {
+                html += `
+                    <h6 class="mt-3">AI分析结果:</h6>
+                    <p><strong>代码质量评分:</strong> ${result.aiFeedback.codeQuality}/100</p>
+                    <p><strong>分析说明:</strong> ${result.aiFeedback.explanation}</p>
+                    <p><strong>优化建议:</strong></p>
+                    <ul>
+                        ${result.aiFeedback.suggestions.map(s => `<li>${s}</li>`).join('')}
+                    </ul>
+                `;
+            }
+            
+            document.getElementById('resultContent').innerHTML = html;
+            document.getElementById('resultPanel').style.display = 'block';
+        }
+        
+        function showError(message) {
+            document.getElementById('resultContent').innerHTML = 
+                `<div class="alert alert-danger">${message}</div>`;
+            document.getElementById('resultPanel').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

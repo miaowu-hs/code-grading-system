@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  # 测试用的MySQL数据库
+  mysql-test:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=789***tyu(*
+      - MYSQL_DATABASE=code_grading_test
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+
+  # Redis测试缓存
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+volumes:
+  mysql_test_data:

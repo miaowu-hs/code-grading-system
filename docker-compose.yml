@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  code-grading-system:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    volumes:
+      - ./sandbox:/app/sandbox
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: code_grading_db
+      MYSQL_USER: codegrader
+      MYSQL_PASSWORD: 789***tyu(
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
