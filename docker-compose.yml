@@ -5,7 +5,7 @@ services:
     ports:
       - "8085:8085"
     environment:
-      - DASHSCOPE_API_KEY=sk-sp-dc98f3eb5f524bbca679af6956d1bb0c
+      - spring.ai.dashscope.api-key=sk-sp-dc98f3eb5f524bbca679af6956d1bb0c
     networks:
       - code-grading-network
     restart: unless-stopped

@@ -5,7 +5,7 @@ services:
   mysql-test:
     image: mysql:8.0
     environment:
-      - MYSQL_ROOT_PASSWORD=789***tyu(*
+      - MYSQL_ROOT_PASSWORD=789***tyu
       - MYSQL_DATABASE=code_grading_test
     ports:
       - "3307:3306"
