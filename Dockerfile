@@ -1,20 +1,27 @@
-FROM openjdk:17-jdk-slim
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/eclipse-temurin:17-jdk AS build
 
 WORKDIR /app
 
-# Copy Maven wrapper
-COPY mvnw .
-COPY .mvn .mvn
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends maven \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
 COPY pom.xml .
 COPY src src
+COPY deploy/maven/settings.xml /root/.m2/settings.xml
 
-# Build the application
-RUN ./mvnw clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# Expose port
-EXPOSE 8080
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/eclipse-temurin:17-jdk
 
-# Run the application
-CMD ["java", "-jar", "target/code-grading-system-0.0.1-SNAPSHOT.jar"]
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/target/code-grading-system-1.0.0.jar app.jar
+
+EXPOSE 8085
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

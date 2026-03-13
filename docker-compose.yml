@@ -1,15 +1,37 @@
-version: '3.8'
 services:
-  code-grading-backend:
-    build: .
-    ports:
-      - "8085:8085"
+  mysql:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/mysql:8.0
+    container_name: code-grading-mysql
     environment:
-      - spring.ai.dashscope.api-key=sk-sp-dc98f3eb5f524bbca679af6956d1bb0c
-    networks:
-      - code-grading-network
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-789***tyu}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-code_grading_system}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-789***tyu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
-networks:
-  code-grading-network:
-    driver: bridge
+  app:
+    build: .
+    container_name: code-grading-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-code_grading_system}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-789***tyu}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_API_URL: ${AI_API_URL:-}
+      AI_MODEL: ${AI_MODEL:-}
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8085}:8085"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

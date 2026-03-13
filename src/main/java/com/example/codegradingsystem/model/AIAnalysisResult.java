@@ -1,12 +1,49 @@
 package com.example.codegradingsystem.model;
 
-import lombok.Data;
-
-@Data
 public class AIAnalysisResult {
-    private int codeQualityScore; // 代码质量评分 (0-100)
-    private String explanation; // 错误解释
-    private String[] suggestions; // 优化建议
-    private String learningTips; // 学习提示
-    private boolean hasSecurityIssues; // 是否有安全问题
+    private int codeQuality;
+    private String explanation;
+    private String[] suggestions;
+    private String[] fixSteps;
+    private String[] knowledgePoints;
+
+    public int getCodeQuality() {
+        return codeQuality;
+    }
+
+    public void setCodeQuality(int codeQuality) {
+        this.codeQuality = codeQuality;
+    }
+
+    public String getExplanation() {
+        return explanation;
+    }
+
+    public void setExplanation(String explanation) {
+        this.explanation = explanation;
+    }
+
+    public String[] getSuggestions() {
+        return suggestions;
+    }
+
+    public void setSuggestions(String[] suggestions) {
+        this.suggestions = suggestions;
+    }
+
+    public String[] getFixSteps() {
+        return fixSteps;
+    }
+
+    public void setFixSteps(String[] fixSteps) {
+        this.fixSteps = fixSteps;
+    }
+
+    public String[] getKnowledgePoints() {
+        return knowledgePoints;
+    }
+
+    public void setKnowledgePoints(String[] knowledgePoints) {
+        this.knowledgePoints = knowledgePoints;
+    }
 }

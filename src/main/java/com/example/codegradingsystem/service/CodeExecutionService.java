@@ -1,293 +1,295 @@
 package com.example.codegradingsystem.service;
 
-<<<<<<< HEAD
-import org.springframework.stereotype.Service;
-import java.io.IOException;
-
-/**
- * 代码执行服务 - 负责安全地执行用户提交的代码
- * 使用Docker容器进行隔离
- */
-@Service
-public class CodeExecutionService {
-    
-    /**
-     * 在Docker容器中执行代码
-     * @param code 用户提交的代码
-     * @param language 编程语言 (java, python, cpp)
-     * @param testCases 测试用例
-     * @return 执行结果
-     */
-    public ExecutionResult executeCode(String code, String language, TestCase[] testCases) throws IOException, InterruptedException {
-        // TODO: 实现Docker容器执行逻辑
-        return new ExecutionResult();
-=======
 import com.example.codegradingsystem.model.CodeSubmission;
 import com.example.codegradingsystem.model.ExecutionResult;
 import com.example.codegradingsystem.model.TestCase;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Docker安全沙箱代码执行服务
- * 支持Java/Python/C++多语言安全执行
- */
 @Service
-@Slf4j
 public class CodeExecutionService {
-    
-    // Docker执行配置
-    private static final String DOCKER_IMAGE = "openjdk:17-jdk-slim";
-    private static final int CPU_LIMIT = 1; // 1个CPU核心
-    private static final long MEMORY_LIMIT = 512 * 1024 * 1024; // 512MB
-    private static final int TIMEOUT_SECONDS = 30; // 30秒超时
-    
-    /**
-     * 执行用户提交的代码
-     * @param language 编程语言 (java/python/cpp)
-     * @param sourceCode 源代码
-     * @param testCases 测试用例列表
-     * @return 执行结果
-     */
+
+    private static final long TIMEOUT_SECONDS = 30;
+    private static final boolean WINDOWS = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win");
+    private static final String[] WINDOWS_EXECUTABLE_SUFFIXES = {".exe", ".cmd", ".bat", ""};
+
+    public ExecutionResult executeCode(CodeSubmission submission) {
+        return executeCode(submission.getLanguage(), submission.getSourceCode(), submission.getTestCases());
+    }
+
     public ExecutionResult executeCode(String language, String sourceCode, List<TestCase> testCases) {
+        ExecutionResult result = new ExecutionResult();
         Path tempDir = null;
+        long startedAt = System.nanoTime();
         try {
-            // 1. 创建临时工作目录
-            tempDir = Files.createTempDirectory("code-execution-");
-            log.info("Created temp directory: {}", tempDir);
-            
-            // 2. 写入源代码文件
+            validateSubmission(language, sourceCode);
+            tempDir = Files.createTempDirectory("code-grading-");
             writeSourceCode(tempDir, language, sourceCode);
-            
-            // 3. 编译代码（如果需要）
+
             ExecutionResult compileResult = compileCode(language, tempDir);
             if (!compileResult.isCompileSuccess()) {
+                compileResult.setExecutionTime(toMillis(startedAt));
+                compileResult.setError(true);
                 return compileResult;
             }
-            
-            // 4. 执行测试用例
+
+            List<TestCase> effectiveTestCases = normalizeTestCases(testCases);
             List<String> outputs = new ArrayList<>();
-            for (TestCase testCase : testCases) {
-                String output = executeWithInput(language, tempDir, testCase.getInput());
+            for (TestCase testCase : effectiveTestCases) {
+                String output = runWithInput(language, tempDir, testCase.getInput());
                 outputs.add(output);
-                
-                // 检查是否超时或出错
-                if (output.contains("TIMEOUT") || output.contains("ERROR")) {
-                    break;
+                if (output.startsWith("ERROR:") || output.startsWith("TIMEOUT:")) {
+                    result.setCompileSuccess(true);
+                    result.setRuntimeSuccess(false);
+                    result.setError(true);
+                    result.setErrorMessage(output);
+                    result.setOutputs(outputs);
+                    result.setOutput(output);
+                    result.setExecutionTime(toMillis(startedAt));
+                    return result;
                 }
             }
-            
-            // 5. 构建成功结果
-            ExecutionResult result = new ExecutionResult();
+
             result.setCompileSuccess(true);
             result.setRuntimeSuccess(true);
             result.setOutputs(outputs);
-            result.setExecutionTime(0); // 实际执行时间需要更精确测量
-            
+            result.setOutput(outputs.isEmpty() ? "" : outputs.get(outputs.size() - 1));
+            result.setExecutionTime(toMillis(startedAt));
             return result;
-            
         } catch (Exception e) {
-            log.error("Code execution failed", e);
-            ExecutionResult errorResult = new ExecutionResult();
-            errorResult.setCompileSuccess(false);
-            errorResult.setErrorMessage(e.getMessage());
-            return errorResult;
+            result.setCompileSuccess(false);
+            result.setRuntimeSuccess(false);
+            result.setError(true);
+            result.setErrorMessage(e.getMessage());
+            result.setExecutionTime(toMillis(startedAt));
+            return result;
         } finally {
-            // 6. 清理临时文件
             if (tempDir != null) {
-                cleanupTempDirectory(tempDir);
+                cleanupDirectory(tempDir);
             }
         }
->>>>>>> 99195a5 (feat: complete implementation of code execution and AI analysis services)
     }
-    
-    /**
-     * 编译代码（针对需要编译的语言）
-     */
-<<<<<<< HEAD
-    public CompileResult compileCode(String code, String language) throws IOException, InterruptedException {
-        // TODO: 实现编译逻辑
-        return new CompileResult();
-=======
-    public ExecutionResult compileCode(String language, Path tempDir) {
-        try {
-            String compileCommand = getCompileCommand(language, tempDir);
-            if (compileCommand == null) {
-                // 解释型语言不需要编译
-                ExecutionResult result = new ExecutionResult();
-                result.setCompileSuccess(true);
-                return result;
-            }
-            
-            Process process = Runtime.getRuntime().exec(compileCommand);
-            boolean completed = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            
-            if (!completed) {
-                process.destroyForcibly();
-                ExecutionResult timeoutResult = new ExecutionResult();
-                timeoutResult.setCompileSuccess(false);
-                timeoutResult.setErrorMessage("Compilation timeout");
-                return timeoutResult;
-            }
-            
-            if (process.exitValue() == 0) {
-                ExecutionResult successResult = new ExecutionResult();
-                successResult.setCompileSuccess(true);
-                return successResult;
-            } else {
-                String errorOutput = readProcessOutput(process.getErrorStream());
-                ExecutionResult errorResult = new ExecutionResult();
-                errorResult.setCompileSuccess(false);
-                errorResult.setErrorMessage("Compilation failed: " + errorOutput);
-                return errorResult;
-            }
-            
-        } catch (Exception e) {
-            log.error("Compilation failed", e);
-            ExecutionResult errorResult = new ExecutionResult();
-            errorResult.setCompileSuccess(false);
-            errorResult.setErrorMessage("Compilation error: " + e.getMessage());
-            return errorResult;
+
+    private void validateSubmission(String language, String sourceCode) {
+        if (language == null || language.isBlank()) {
+            throw new IllegalArgumentException("Language is required");
+        }
+        if (sourceCode == null || sourceCode.isBlank()) {
+            throw new IllegalArgumentException("Source code is required");
         }
     }
-    
-    /**
-     * 写入源代码文件
-     */
+
+    private List<TestCase> normalizeTestCases(List<TestCase> testCases) {
+        if (testCases == null || testCases.isEmpty()) {
+            return List.of(new TestCase("", ""));
+        }
+        return testCases;
+    }
+
     private void writeSourceCode(Path tempDir, String language, String sourceCode) throws IOException {
-        String filename = getSourceFilename(language);
-        Path sourceFile = tempDir.resolve(filename);
-        Files.write(sourceFile, sourceCode.getBytes());
-        log.info("Wrote source code to: {}", sourceFile);
+        Path sourceFile = tempDir.resolve(getSourceFileName(language));
+        Files.writeString(sourceFile, sourceCode, StandardCharsets.UTF_8);
     }
-    
-    /**
-     * 获取源代码文件名
-     */
-    private String getSourceFilename(String language) {
-        switch (language.toLowerCase()) {
-            case "java":
-                return "Main.java";
-            case "python":
-                return "main.py";
-            case "cpp":
-                return "main.cpp";
-            default:
-                throw new IllegalArgumentException("Unsupported language: " + language);
+
+    private ExecutionResult compileCode(String language, Path tempDir) throws IOException, InterruptedException {
+        List<String> command = getCompileCommand(language, tempDir);
+        ExecutionResult result = new ExecutionResult();
+        if (command == null) {
+            result.setCompileSuccess(true);
+            return result;
         }
-    }
-    
-    /**
-     * 获取编译命令
-     */
-    private String getCompileCommand(String language, Path tempDir) {
-        switch (language.toLowerCase()) {
-            case "java":
-                return "javac -d " + tempDir + " " + tempDir + "/Main.java";
-            case "cpp":
-                return "g++ -o " + tempDir + "/main " + tempDir + "/main.cpp";
-            case "python":
-                return null; // Python不需要编译
-            default:
-                throw new IllegalArgumentException("Unsupported language: " + language);
+
+        Process process = new ProcessBuilder(command)
+                .directory(tempDir.toFile())
+                .start();
+
+        boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            result.setCompileSuccess(false);
+            result.setError(true);
+            result.setErrorMessage("Compilation timeout");
+            return result;
         }
+
+        if (process.exitValue() != 0) {
+            result.setCompileSuccess(false);
+            result.setError(true);
+            result.setErrorMessage(readStream(process.getErrorStream()));
+            return result;
+        }
+
+        result.setCompileSuccess(true);
+        return result;
     }
-    
-    /**
-     * 执行代码并获取输出
-     */
-    private String executeWithInput(String language, Path tempDir, String input) {
-        try {
-            String executeCommand = getExecuteCommand(language, tempDir);
-            ProcessBuilder pb = new ProcessBuilder(executeCommand.split(" "));
-            pb.directory(tempDir.toFile());
-            
-            Process process = pb.start();
-            
-            // 写入输入
-            if (input != null && !input.isEmpty()) {
-                try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream())) {
-                    writer.write(input);
-                    writer.flush();
+
+    private String runWithInput(String language, Path tempDir, String input) throws IOException, InterruptedException {
+        List<String> command = getRunCommand(language, tempDir);
+        Process process = new ProcessBuilder(command)
+                .directory(tempDir.toFile())
+                .start();
+
+        try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8)) {
+            if (input != null) {
+                writer.write(input);
+            }
+        }
+
+        boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            return "TIMEOUT: Execution exceeded " + TIMEOUT_SECONDS + " seconds";
+        }
+
+        if (process.exitValue() != 0) {
+            String errorOutput = readStream(process.getErrorStream());
+            if (errorOutput == null || errorOutput.isBlank()) {
+                errorOutput = "Process exited with code " + process.exitValue();
+            }
+            return "ERROR: " + errorOutput;
+        }
+
+        return readStream(process.getInputStream());
+    }
+
+    private List<String> getCompileCommand(String language, Path tempDir) {
+        return switch (normalizeLanguage(language)) {
+            case "java" -> {
+                ensureCommandAvailable("javac");
+                yield List.of("javac", "-encoding", "UTF-8", tempDir.resolve("Main.java").toString());
+            }
+            case "python" -> null;
+            case "cpp" -> {
+                ensureCommandAvailable("g++");
+                yield WINDOWS
+                        ? List.of("g++", "-o", tempDir.resolve("main.exe").toString(), tempDir.resolve("main.cpp").toString())
+                        : List.of("g++", "-o", tempDir.resolve("main").toString(), tempDir.resolve("main.cpp").toString());
+            }
+            default -> throw new IllegalArgumentException("Unsupported language: " + language);
+        };
+    }
+
+    private List<String> getRunCommand(String language, Path tempDir) {
+        return switch (normalizeLanguage(language)) {
+            case "java" -> {
+                ensureCommandAvailable("java");
+                yield List.of("java", "-cp", tempDir.toString(), "Main");
+            }
+            case "python" -> {
+                String pythonCommand = firstAvailableCommand("python3", "python");
+                if (pythonCommand == null) {
+                    throw new IllegalArgumentException("Python execution is not available on this machine because neither python3 nor python is installed");
                 }
+                yield List.of(pythonCommand, tempDir.resolve("main.py").toString());
             }
-            
-            boolean completed = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            
-            if (!completed) {
-                process.destroyForcibly();
-                return "TIMEOUT: Execution exceeded " + TIMEOUT_SECONDS + " seconds";
+            case "cpp" -> {
+                ensureCommandAvailable("g++");
+                yield WINDOWS
+                        ? List.of(tempDir.resolve("main.exe").toString())
+                        : List.of(tempDir.resolve("main").toString());
             }
-            
-            if (process.exitValue() == 0) {
-                return readProcessOutput(process.getInputStream());
-            } else {
-                String errorOutput = readProcessOutput(process.getErrorStream());
-                return "ERROR: " + errorOutput;
-            }
-            
-        } catch (Exception e) {
-            log.error("Execution failed", e);
-            return "ERROR: " + e.getMessage();
-        }
+            default -> throw new IllegalArgumentException("Unsupported language: " + language);
+        };
     }
-    
-    /**
-     * 获取执行命令
-     */
-    private String getExecuteCommand(String language, Path tempDir) {
-        switch (language.toLowerCase()) {
-            case "java":
-                return "java -cp " + tempDir + " Main";
-            case "python":
-                return "python3 main.py";
-            case "cpp":
-                return "./main";
-            default:
-                throw new IllegalArgumentException("Unsupported language: " + language);
-        }
+
+    private String getSourceFileName(String language) {
+        return switch (normalizeLanguage(language)) {
+            case "java" -> "Main.java";
+            case "python" -> "main.py";
+            case "cpp" -> "main.cpp";
+            default -> throw new IllegalArgumentException("Unsupported language: " + language);
+        };
     }
-    
-    /**
-     * 读取进程输出
-     */
-    private String readProcessOutput(InputStream inputStream) throws IOException {
-        StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+
+    private String normalizeLanguage(String language) {
+        return language.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private String readStream(InputStream stream) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+                if (builder.length() > 0) {
+                    builder.append(System.lineSeparator());
+                }
+                builder.append(line);
             }
         }
-        return output.toString().trim();
+        return builder.toString();
     }
-    
-    /**
-     * 清理临时目录
-     */
-    private void cleanupTempDirectory(Path tempDir) {
+
+    private void cleanupDirectory(Path directory) {
         try {
-            Files.walk(tempDir)
-                .sorted((p1, p2) -> -p1.compareTo(p2))
-                .forEach(path -> {
-                    try {
-                        Files.delete(path);
-                    } catch (IOException e) {
-                        log.warn("Failed to delete temp file: {}", path, e);
-                    }
-                });
-            log.info("Cleaned up temp directory: {}", tempDir);
-        } catch (IOException e) {
-            log.warn("Failed to cleanup temp directory: {}", tempDir, e);
+            Files.walk(directory)
+                    .sorted((left, right) -> right.compareTo(left))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ignored) {
+                        }
+                    });
+        } catch (IOException ignored) {
         }
->>>>>>> 99195a5 (feat: complete implementation of code execution and AI analysis services)
+    }
+
+    private long toMillis(long startedAt) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+    }
+
+    private void ensureCommandAvailable(String command) {
+        if (firstAvailableCommand(command) == null) {
+            throw new IllegalArgumentException(command + " is not installed or not available in PATH");
+        }
+    }
+
+    private String firstAvailableCommand(String... commands) {
+        for (String command : commands) {
+            if (isCommandAvailable(command)) {
+                return command;
+            }
+        }
+        return null;
+    }
+
+    private boolean isCommandAvailable(String command) {
+        String path = System.getenv("PATH");
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+
+        String[] directories = path.split(File.pathSeparator);
+        if (WINDOWS) {
+            for (String directory : directories) {
+                for (String suffix : WINDOWS_EXECUTABLE_SUFFIXES) {
+                    File candidate = new File(directory, command + suffix);
+                    if (candidate.isFile()) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        for (String directory : directories) {
+            File candidate = new File(directory, command);
+            if (candidate.isFile() && candidate.canExecute()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

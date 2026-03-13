@@ -1,0 +1,7 @@
+.git
+.idea
+app.out.log
+app.err.log
+backend.log
+run.pid
+target/
